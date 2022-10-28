@@ -15,6 +15,8 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let conditions = set_conditions();
+    println!("Evaluating pods for {:?}", conditions);
+
     let mut all_pods: Vec<Pod> = Vec::new();
     let ten_secs = time::Duration::from_secs(60);
     loop {
@@ -22,6 +24,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         for pod in pods.iter() {
             let pod_clone = pod.clone();
             if !all_pods.contains(pod) {
+                println!("Collecting for pod {}", pod.metadata.name);
                 all_pods.push(pod.clone());
                 task::spawn(async {
                     let _ = handle_pod(pod_clone).await;
@@ -76,6 +79,7 @@ async fn get_pods_with_names(conditions: &Vec<Condition>) -> Result<Vec<Pod>, Bo
                 continue 'outer;
             }
         }
+        println!("Adding pod: {}", pod.metadata.name);
         pods.push(pod);
     }
     Ok(pods)
