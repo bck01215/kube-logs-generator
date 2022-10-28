@@ -62,7 +62,7 @@ async fn get_pods_with_names(conditions: &Vec<Condition>) -> Result<Vec<Pod>, Bo
     let mut pods: Vec<Pod> = Vec::new();
     let client = reqwest::Client::new();
     let resp = client
-        .get("https://okd-cluster.liberty.edu".to_string() + "/api/v1/pods")
+        .get(URL.to_string() + "/api/v1/pods")
         .header("Authorization", "Bearer ".to_string() + &TOKEN)
         .send()
         .await?
@@ -84,7 +84,7 @@ async fn get_pods_with_names(conditions: &Vec<Condition>) -> Result<Vec<Pod>, Bo
 async fn handle_pod(pod: Pod) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let mut resp = client
-        .get("https://okd-cluster.liberty.edu".to_string() + &pod.metadata.self_link + "/log?timestamps=true&follow=true&tailLines=0")
+        .get(URL.to_string() + &pod.metadata.self_link + "/log?timestamps=true&follow=true&tailLines=0")
         .header("Authorization", "Bearer ".to_string() + &TOKEN)
         .send()
         .await?;
