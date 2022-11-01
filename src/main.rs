@@ -1,10 +1,10 @@
 use kube_logs_generator::structures::{Condition, Pod, Pods};
 use lazy_static::lazy_static;
+use rev_buf_reader::RevBufReader;
 use std::{
     env,
     fs::{create_dir, File, OpenOptions},
-    io::{prelude::*, BufReader},
-    path::Path,
+    io::prelude::*,
     thread, time,
 };
 use tokio::task;
@@ -17,7 +17,7 @@ lazy_static! {
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let conditions = set_conditions();
     println!("Evaluating pods for {:?}", conditions);
-    let secs = time::Duration::from_secs(10);
+    let secs = time::Duration::from_secs(30);
     loop {
         let pods = get_pods_with_names(&conditions).await?;
         for pod in pods.iter() {
@@ -81,9 +81,10 @@ async fn get_pods_with_names(conditions: &Vec<Condition>) -> Result<Vec<Pod>, Bo
 }
 
 async fn handle_pod(pod: Pod) -> Result<(), Box<dyn std::error::Error>> {
+    let limit: usize = 2000;
     let client = reqwest::Client::new();
     let resp = client
-        .get(URL.to_string() + &pod.metadata.self_link + "/log?timestamps=true")
+        .get(URL.to_string() + &pod.metadata.self_link + "/log?timestamps=true&tailLines=" + &limit.to_string())
         .header("Authorization", "Bearer ".to_string() + &TOKEN)
         .send()
         .await?;
@@ -93,7 +94,7 @@ async fn handle_pod(pod: Pod) -> Result<(), Box<dyn std::error::Error>> {
     let text = resp.text().await?;
     let mut file = OpenOptions::new().write(true).append(true).create(true).read(true).open(file_name).unwrap();
     let chunks = text.split('\n');
-    let cur_lines = lines_from_file(file_name);
+    let cur_lines = lines_from_file(&file, limit);
     'while_loop: for chunk in chunks {
         let end_stamp_index = chunk.find('Z').unwrap_or(0);
         if chunk.len() < end_stamp_index + 2 {
@@ -117,8 +118,7 @@ async fn handle_pod(pod: Pod) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
-    let file = File::open(filename).expect("no such file");
-    let buf = BufReader::new(file);
-    buf.lines().map(|l| l.expect("Could not parse line")).collect()
+fn lines_from_file(file: &File, limit: usize) -> Vec<String> {
+    let buf = RevBufReader::new(file);
+    buf.lines().take(limit).map(|l| l.expect("Could not parse line")).collect()
 }
